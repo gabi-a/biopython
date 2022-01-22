@@ -171,6 +171,7 @@ PACKAGES = [
     "Bio.Sequencing.Applications",
     "Bio.SVDSuperimposer",
     "Bio.PDB.QCPSuperimposer",
+    "Bio.PDB.xtal",
     "Bio.SwissProt",
     "Bio.TogoWS",
     "Bio.Phylo",
