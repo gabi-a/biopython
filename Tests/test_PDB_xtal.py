@@ -11,7 +11,25 @@ except ImportError:
     ) from None
 
 from Bio.PDB.xtal import CrystalCell
+from Bio.PDB.xtal import BravaisLattice
 from Bio.PDB.vectors import Vector, rotaxis2m
+
+
+class BravaisLatticeTests(unittest.TestCase):
+    def test_triclinic(self):
+        bl = BravaisLattice["TRICLINIC"]
+        self.assertEqual(1, bl.get_id())
+        self.assertEqual("TRICLINIC", bl.get_name())
+        expected = CrystalCell(1.00, 1.25, 1.50, 60, 70, 80)
+        result = bl.get_example_unit_cell()
+        self.assertEqual(expected, result, f"Expected {expected}, got {result}")
+
+        bl = BravaisLattice.TRICLINIC
+        self.assertEqual(1, bl.get_id())
+        self.assertEqual("TRICLINIC", bl.get_name())
+        expected = CrystalCell(1.00, 1.25, 1.50, 60, 70, 80)
+        result = bl.get_example_unit_cell()
+        self.assertEqual(expected, result, f"Expected {expected}, got {result}")
 
 
 class CrystalCellTests(unittest.TestCase):

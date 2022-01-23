@@ -53,6 +53,16 @@ class CrystalCell:
         self.m_transp = None
         self.m_transp_inv = None
 
+    def __eq__(self, other):
+        return (
+            self.a == other.a
+            and self.b == other.b
+            and self.c == other.c
+            and self.alpha == other.alpha
+            and self.beta == other.beta
+            and self.gamma == other.gamma
+        )
+
     def __str__(self):
         return f"{self.a:7.2f} {self.b:7.2f} {self.c:7.2f} {self.alpha:6.2f} {self.beta:6.2f} {self.gamma:6.2f}"
 
