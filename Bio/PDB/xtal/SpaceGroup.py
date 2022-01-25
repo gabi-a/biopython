@@ -136,6 +136,14 @@ class SpaceGroup:
         self.axis_angles = None
         self.axis_types = None  # indices of array are transformIds
 
+    def is_enantiomorphic(self):
+        """Test if this space group is enantiomorphic."""
+        m = self.non_enant_pat.match(self.short_symbol)
+        if m is not None:
+            return False
+        else:
+            return True
+
     def get_transformations(self):
         """Get transformation matrices."""
         if self.transformations is not None:
@@ -177,6 +185,14 @@ class SpaceGroup:
                 self.cell_translations[n] = t[:3, 3]
 
         return self.cell_translations
+
+    def get_brav_lattice(self):
+        """Return Bravais lattice."""
+        return self.bravais_lattice
+
+    def get_cell_translation(self, n):
+        """Return cell translation."""
+        return self.get_cell_translations()[n]
 
     def get_multiplicity(self):
         """Return multiplicity."""

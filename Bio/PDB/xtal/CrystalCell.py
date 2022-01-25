@@ -394,7 +394,7 @@ class CrystalCell:
         # note we need to have a relaxed tolerance here as the PDB scale matrix is given with not such high precision
         # plus we don't want to have false positives, so we stay conservative
         tolerance = vol / 100.0
-        if np.abs(vol - 1.0 / np.det(m)) > tolerance:
+        if np.abs(vol - 1.0 / np.linalg.det(m)) > tolerance:
             return False
 
         # this would be to check our own matrix, must always match!
