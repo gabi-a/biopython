@@ -44,14 +44,14 @@ class CrystalCell:
         self.set_beta(beta)
         self.set_gamma(gamma)
 
-        self.volume = None
-        self.max_dimension = 0
+        self._volume = None
+        self._max_dimension = 0
 
         # cached basis change transformation matrices
-        self.m = None
-        self.m_inv = None
-        self.m_transp = None
-        self.m_transp_inv = None
+        self._m = None
+        self._m_inv = None
+        self._m_transp = None
+        self._m_transp_inv = None
 
     def __eq__(self, other):
         return (
@@ -96,10 +96,10 @@ class CrystalCell:
         :return: Volume of this unit cell
         :rtype: float
         """
-        if self.volume is not None:
-            return self.volume
+        if self._volume is not None:
+            return self._volume
 
-        self.volume = (
+        self._volume = (
             self.a
             * self.b
             * self.c
@@ -116,7 +116,7 @@ class CrystalCell:
             ** 0.5
         )
 
-        return self.volume
+        return self._volume
 
     def get_cell_indices(self, pt):
         """Get the index of a unit cell to which the query point belongs.
@@ -315,10 +315,10 @@ class CrystalCell:
         :return: Minv
         :rtype: ndarray(dtype=float, shape=(3,3))
         """
-        if self.m_inv is not None:
-            return self.m_inv
+        if self._m_inv is not None:
+            return self._m_inv
 
-        self.m_inv = np.array(
+        self._m_inv = np.array(
             [
                 [self.a, 0, 0],
                 [self.b * np.cos(self.gamma_rad), self.b * np.sin(self.gamma_rad), 0],
@@ -330,7 +330,7 @@ class CrystalCell:
             ]
         )
 
-        return self.m_inv
+        return self._m_inv
 
     def _get_c_star(self):
         return (self.a * self.b * np.sin(self.gamma_rad)) / self.get_volume()
@@ -341,32 +341,32 @@ class CrystalCell:
         ) / (np.sin(self.beta_rad) * np.sin(self.gamma_rad))
 
     def _get_m(self):
-        if self.m is not None:
-            return self.m
-        self.m = np.linalg.inv(self._get_m_inv())
-        return self.m
+        if self._m is not None:
+            return self._m
+        self._m = np.linalg.inv(self._get_m_inv())
+        return self._m
 
     def get_m_transpose(self):
         """Return m transpose."""
-        if self.m_transp is not None:
-            return self.m_transp
+        if self._m_transp is not None:
+            return self._m_transp
         m = self._get_m()
-        self.m_transp = m.T
-        return self.m_transp
+        self._m_transp = m.T
+        return self._m_transp
 
     def _get_m_transpose_inv(self):
-        if self.m_transp_inv is not None:
-            return self.m_transp_inv
-        self.m_transp_inv = np.linalg.inv(self.get_m_transpose())
-        return self.m_transp_inv
+        if self._m_transp_inv is not None:
+            return self._m_transp_inv
+        self._m_transp_inv = np.linalg.inv(self.get_m_transpose())
+        return self._m_transp_inv
 
     def _distance(a, b):
         return sum((a - b) ** 2) ** 0.5
 
     def get_max_dimension(self):
         """Return max dimension of cell."""
-        if self.max_dimension != 0:
-            return self.max_dimension
+        if self._max_dimension != 0:
+            return self._max_dimension
         import itertools
 
         vecs = [np.array(x) for x in map(list, itertools.product([0, 1], repeat=3))]
@@ -442,9 +442,9 @@ class CrystalCell:
         :rtype: bool
         """
         if (
-            (self.a < self.mIN_VALID_CELL_SIZE)
-            and (self.b < self.mIN_VALID_CELL_SIZE)
-            and (self.c < self.mIN_VALID_CELL_SIZE)
+            (self.a < self._mIN_VALID_CELL_SIZE)
+            and (self.b < self._mIN_VALID_CELL_SIZE)
+            and (self.c < self._mIN_VALID_CELL_SIZE)
         ):
             return False
         return True

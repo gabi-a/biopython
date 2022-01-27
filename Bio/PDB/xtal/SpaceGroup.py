@@ -103,11 +103,11 @@ class SpaceGroup:
     See: http://en.wikipedia.org/wiki/Space_group
     """
 
-    split_pat1 = re.compile("((?:[+-]?[XYZ])+)([+-][0-9/.]+)")
-    split_pat2 = re.compile("([+-]?[0-9/.]+)((?:[+-][XYZ])+)")
-    coord_pat = re.compile("(?:([+-])?([XYZ]))+?")
-    transf_coef_pat = re.compile("([-+]?[0-9.]+)(?:/([0-9.]+))?")
-    non_enant_pat = re.compile("[-abcmnd]")
+    _split_pat1 = re.compile("((?:[+-]?[XYZ])+)([+-][0-9/.]+)")
+    _split_pat2 = re.compile("([+-]?[0-9/.]+)((?:[+-][XYZ])+)")
+    _coord_pat = re.compile("(?:([+-])?([XYZ]))+?")
+    _transf_coef_pat = re.compile("([-+]?[0-9.]+)(?:/([0-9.]+))?")
+    _non_enant_pat = re.compile("[-abcmnd]")
 
     DELTA = 0.0000001
 
@@ -130,15 +130,15 @@ class SpaceGroup:
         self.transf_algebraic = transf_algebraic
         self.bravais_lattice = bravais_lattice
 
-        self.transformations = None
-        self.cell_translations = None  # in space groups I, C, F or H there are pure cell translations corresponding to recenterings
+        self._transformations = None
+        self._cell_translations = None  # in space groups I, C, F or H there are pure cell translations corresponding to recenterings
 
-        self.axis_angles = None
-        self.axis_types = None  # indices of array are transformIds
+        self._axis_angles = None
+        self._axis_types = None  # indices of array are transformIds
 
     def is_enantiomorphic(self):
         """Test if this space group is enantiomorphic."""
-        m = self.non_enant_pat.match(self.short_symbol)
+        m = self._non_enant_pat.search(self.short_symbol)
         if m is not None:
             return False
         else:
@@ -146,14 +146,14 @@ class SpaceGroup:
 
     def get_transformations(self):
         """Get transformation matrices."""
-        if self.transformations is not None:
-            return self.transformations
+        if self._transformations is not None:
+            return self._transformations
 
-        self.transformations = []
+        self._transformations = []
         for transf in self.transf_algebraic:
-            self.transformations.append(self._get_matrix_from_algebraic(transf))
+            self._transformations.append(self._get_matrix_from_algebraic(transf))
 
-        return self.transformations
+        return self._transformations
 
     @staticmethod
     def parse_space_group(short_name):
@@ -165,15 +165,15 @@ class SpaceGroup:
 
     def get_cell_translations(self):
         """Return cell translations."""
-        if (self.cell_translations is not None) and (len(self.cell_translations) > 0):
-            return self.cell_translations
+        if (self._cell_translations is not None) and (len(self._cell_translations) > 0):
+            return self._cell_translations
 
         if self.multiplicity == self.primitive_multiplicity:
             return
 
         fold = int(self.multiplicity / self.primitive_multiplicity)
-        self.cell_translations = [None] * fold
-        self.cell_translations[0] = np.array([0, 0, 0])
+        self._cell_translations = [None] * fold
+        self._cell_translations[0] = np.array([0, 0, 0])
         transformations = self.get_transformations()
         for n in range(1, fold):
             if len(transformations) < n * self.primitive_multiplicity:
@@ -182,9 +182,9 @@ class SpaceGroup:
                     BiopythonWarning,
                 )
                 t = transformations[n * self.primitive_multiplicity]
-                self.cell_translations[n] = t[:3, 3]
+                self._cell_translations[n] = t[:3, 3]
 
-        return self.cell_translations
+        return self._cell_translations
 
     def get_brav_lattice(self):
         """Return Bravais lattice."""
@@ -228,15 +228,15 @@ class SpaceGroup:
         return self.alt_short_symbol
 
     def _get_rot_axes_and_angles(self):
-        if self.axis_angles is not None:
-            return self.axis_angles
-        axis_angles = [None] * self.multiplicity
-        axis_angles[0] = (0, Vector(0, 0, 0))
+        if self._axis_angles is not None:
+            return self._axis_angles
+        self._axis_angles = [None] * self.multiplicity
+        self._axis_angles[0] = (0, Vector(0, 0, 0))
         transformations = self.get_transformations()
         for i in range(1, len(transformations)):
             r = transformations[i][:3, :3]
-            axis_angles[i] = m2rotaxis(r)
-        return self.axis_angles
+            self._axis_angles[i] = self._get_rot_axis_and_angle(r)  # m2rotaxis(r)
+        return self._axis_angles
 
     def _get_axis_fold_types(self):
         """Calculate axis fold type for rotations.
@@ -245,13 +245,13 @@ class SpaceGroup:
             from the trace of the rotation matrix, see for instance
             http://www.crystallography.fr/mathcryst/pdf/Gargnano/Aroyo_Gargnano_1.pdf
         """
-        if self.axis_types is not None:
-            return self.axis_types
-        self.axis_types = [None] * self.multiplicity
+        if self._axis_types is not None:
+            return self._axis_types
+        self._axis_types = [None] * self.multiplicity
         transformations = self.get_transformations()
         for i in range(len(transformations)):
-            self.axis_types[i] = self.get_rot_axis_type(transformations[i])
-        return self.axis_types
+            self._axis_types[i] = self.get_rot_axis_type(transformations[i])
+        return self._axis_types
 
     def get_axis_fold_type(self, transform_id):
         """Return axis fold for transform.
@@ -387,6 +387,39 @@ class SpaceGroup:
         return f"{frac.numerator:+d}/{frac.denominator}"
 
     @classmethod
+    def _get_rot_axis_and_angle(cls, m):
+        """Return rotation axis and angle from rotation matrix.
+
+        Given a rotation matrix calculates the rotation axis and angle for it.
+        The angle is calculated from the trace, the axis from the eigenvalue
+        decomposition.
+        If given matrix is improper rotation or identity matrix then
+        axis (0,0,0) and angle 0 are returned.
+        """
+        determinant = np.linalg.det(m)
+
+        if not (np.abs(np.abs(determinant) - 1) < cls.DELTA):
+            raise RuntimeError("Given matrix is not a rotation matrix")
+
+        axis_and_angle = (0, Vector(0, 0, 0))
+
+        r = m[:3, :3]
+        if not np.allclose(np.linalg.det(r), 1.0):
+            # improper rotationL return axis 0,0,0 and angle 0
+            return axis_and_angle
+
+        w, v = np.linalg.eig(r)
+
+        if np.allclose(w, 1):
+            # the rotation is an identity: we return axis 0,0,0 and angle 0
+            return axis_and_angle
+
+        index_of_ev_1 = min(np.where(np.abs(w - 1) < SpaceGroup.DELTA))
+        axis = Vector(*(v[index_of_ev_1]))
+        angle = np.arccos((np.sum(w) - 1) / 2)
+        return (angle, axis)
+
+    @classmethod
     def get_rot_axis_type(cls, m):
         """Return type of rotation.
 
@@ -456,12 +489,12 @@ class SpaceGroup:
     def _convert_algebraic_str_to_coefficients(cls, alg_string):
         letters = None
         noLetters = None
-        m = cls.split_pat1.match(alg_string)
+        m = cls._split_pat1.match(alg_string)
         if m is not None:
             letters = m.group(1)
             noLetters = m.group(2)
         else:
-            m = cls.split_pat2.match(alg_string)
+            m = cls._split_pat2.match(alg_string)
             if m is not None:
                 letters = m.group(2)
                 noLetters = m.group(1)
@@ -469,7 +502,7 @@ class SpaceGroup:
                 letters = alg_string
 
         coefficients = np.zeros(4)
-        matches = cls.coord_pat.findall(letters)
+        matches = cls._coord_pat.findall(letters)
         for m in matches:
             s = -1 if m[0] == "-" else 1
             coord = m[1]
@@ -481,7 +514,7 @@ class SpaceGroup:
                 coefficients[2] = s
 
         if noLetters is not None:
-            m = cls.transf_coef_pat.match(noLetters)
+            m = cls._transf_coef_pat.match(noLetters)
             if m is not None:
                 num = float(m.group(1))
                 den = 1.0

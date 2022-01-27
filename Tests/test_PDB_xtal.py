@@ -10,6 +10,8 @@ except ImportError:
         "Install NumPy if you want to use Bio.PDB."
     ) from None
 
+from Bio.PDB.xtal import CrystalTransform
+from Bio.PDB.xtal import TransformType
 from Bio.PDB.xtal import CrystalCell
 from Bio.PDB.xtal import BravaisLattice
 from Bio.PDB.xtal import SpaceGroup
@@ -93,6 +95,104 @@ class SpaceGroupTests(unittest.TestCase):
                 np.abs(np.linalg.det(rot) - 1) < self.DELTA
                 or np.abs(np.linalg.det(rot) + 1) < self.DELTA
             )
+
+            ct = CrystalTransform(space_group, i)
+
+            if space_group.is_enantiomorphic() and space_group.get_id() < 1000:
+
+                # determinant must be 1
+                self.assertTrue(np.allclose(1.0, np.linalg.det(rot)))
+
+                # at least 1 eigenvalue must be 1 (there's one direction that remains unchanged under rotation)
+                w, v = np.linalg.eig(rot)
+                self.assertTrue(np.any(np.close(w, 1)))
+
+                # transpose must be equal to inverse
+                self.assertTrue(np.allclose(rot.T, np.linalg.inv(rot)))
+
+                fold_type = space_group.get_axis_fold_type(i)
+                self.assertTrue(fold_type in [1, 2, 3, 4, 6])
+
+                if not ct.is_pure_translation():
+                    self.assertTrue(ct.is_identity() or ct.is_rotation())
+
+                if not ct.is_rotation():
+                    self.assertTrue(ct.is_identity() or ct.is_pure_translation())
+
+                if (not ct.is_pure_translation()) and ct.is_fractional_translation():
+                    self.assertTrue(fold_type != 1)
+                    self.assertTrue(ct.is_rotation())
+
+            if i == 0:
+                self.assertTrue(ct.is_identity())
+                self.assertFalse(ct.is_pure_crystal_translation())
+                self.assertTrue(ct.get_transform_type() == TransformType.AU)
+
+            self.assertFalse(ct.is_pure_crystal_translation())
+            self.assertFalse(ct.get_transform_type() == TransformType.XTALTRANSL)
+
+            fold_type = space_group.get_axis_fold_type(i)
+            W = m[:3, :3]
+            axis_angle = space_group.get_rot_axis_angle(i)
+            if np.linalg.det(W) > 0:
+                if fold_type == 1:
+                    self.assertTrue(np.allclose(axis_angle[0], 0))
+                else:
+                    self.assertTrue(np.allclose(axis_angle[0], 2 * np.pi / fold_type))
+            else:
+                self.assertTrue(np.allclose(axis_angle[0], 0))
+                if fold_type != -2:
+                    # no glide planes
+                    self.assertTrue(np.allclose(0, ct.get_transl_screw_component()))
+
+            axis = axis_angle[1]
+            transl_screw_component = ct.get_transl_screw_component()
+
+            # if both non-0, then both have to be on the same direction (with perhaps different sense)
+            if (not np.allclose(axis._ar, 0)) and (
+                not np.allclose(transl_screw_component, 0)
+            ):
+                angle = axis.angle(Vector(*transl_screw_component))
+                self.assertTrue(np.allclose(angle, 0) or np.allclose(angle, np.pi))
+
+            if ct.get_transform_type().is_screw():
+                self.assertTrue(
+                    ct.get_transform_type()
+                    in [
+                        TransformType.GLIDE,
+                        TransformType.TWOFOLDSCREW,
+                        TransformType.THREEFOLDSCREW,
+                        TransformType.FOURFOLDSCREW,
+                        TransformType.SIXFOLDSCREW,
+                    ]
+                )
+                self.assertFalse(ct.is_pure_translation())
+
+            if ct.is_pure_translation():
+                self.assertEqual(1, fold_type)
+                self.assertTrue(ct.is_fractional_translation())
+                self.assertTrue(ct.get_transform_type() == TransformType.CELLTRANSL)
+
+            if ct.is_rotation() and (not ct.is_fractional_translation()):
+                self.assertTrue(
+                    ct.get_transform_type()
+                    in [
+                        TransformType.TWOFOLD,
+                        TransformType.THREEFOLD,
+                        TransformType.FOURFOLD,
+                        TransformType.SIXFOLD,
+                    ]
+                )
+                self.assertFalse(ct.get_transform_type().is_screw())
+
+        self.assertEqual(266, len(all_sgs))  # the total count must be 266
+        self.assertEqual(
+            65, count_en
+        )  # enantiomorphic groups (protein crystallography groups)
+        self.assertEqual(165, count_non_en)  # i.e. 266-65-36
+        self.assertEqual(
+            36, count_special
+        )  # the rest of the groups present un symop.lib (sometimes used in PDB)
 
 
 class BravaisLatticeTests(unittest.TestCase):
